@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+# Prints unique lines for unsorted sources
+
+def parse_args():
+	import argparse
+	parser = argparse.ArgumentParser(description="Filter out repeated lines in a file, ignoring order.")
+	parser.add_argument('input_file', nargs='?', type=argparse.FileType('rt'), default="-")
+	parser.add_argument('output_file', nargs='?', type=argparse.FileType('wt'), default="-")
+	parser.add_argument('-i', '--ignore-case', dest='key', action="store_const", const=str.lower, help="case insensitive comparison of lines")
+	return parser.parse_args()
+
+def uniq(input, output, key=None):
+	lines = set()
+	for line in input:
+		val = key(line) if key else line
+		if val in lines:
+			continue
+		lines.add(val)
+		print(line, end="", file=output)
+
+args = parse_args()
+uniq(args.input_file, args.output_file, args.key)
