@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description="Update author and committer email addresses and/or names.")
+    parser.add_argument('-o', '--old-email', nargs="+", help="the old email addresses to replace")
+    parser.add_argument('-e', '--new-email', help="the new email address to use. Defaults to the config user.email")
+    parser.add_argument('-N', '--new-name', help="the name to use if (and only if) the email matches. Defaults to the config user.name")
+    parser.add_argument('-f', '--force', action='store_true', help='force update')
+    return parser.parse_args()
+
+def get_git_config(config):
+    import subprocess
+    command = ["/usr/bin/env", "git", "config", "--get", config]
+    try:
+        value = subprocess.check_output(command)
+        return value[:-1].decode('utf-8') # remove the \n at the env
+    except:
+        return None
+
+def create_filter_expression(old_email, new_email, new_name, **kw):
+    new_email = new_email or get_git_config("user.email")
+    new_name = new_name or get_git_config("user.name")
+    
+    if not old_email or not new_email or not new_name:
+        raise RuntimeError("old-email, new-email, and new-name must be set")
+    
+    parts = []
+    
+    for mail in old_email:
+        for varname in ("COMMITTER", "AUTHOR"):
+            parts.append("""
+    if [ "$GIT_{varname}_EMAIL" = "{old_email}" ]
+    then
+        export GIT_{varname}_NAME="{new_name}"
+        export GIT_{varname}_EMAIL="{new_email}"
+    fi
+""".format(varname=varname, old_email=mail, new_email=new_email, new_name=new_name))
+    return "".join(parts)
+
+def git_filter_branch(expression, force):
+    command = [
+        "/usr/bin/env", "git", "filter-branch"
+    ]
+    if force:
+        command.append("-f")    
+    command.extend(["--env-filter",
+        expression,
+        "--tag-name-filter", "cat", "--", "--branches", "--tags"
+    ])
+    import subprocess
+    return subprocess.run(command)
+    
+args = parse_args()
+expression = create_filter_expression(**vars(args))
+git_filter_branch(expression, args.force)
