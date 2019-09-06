@@ -1,0 +1,4 @@
+#!/bin/sh
+# Removes all .git/index.lock files that mdfind can find, and all in subdirectories of the home directory
+mdfind -name index.lock -0|xargs -0 rmtrash && echo mdfind index.lock finished &
+rmtrash ~/**/.git/index.lock 2>&1 > /dev/null && echo **/.git/index.lock finished &
