@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+
+def parse_args():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="List all deleted files in git, optionally as regex.")
+    parser.add_argument('-x', '--regex', action='store_true', help='print a regex with the escaped value, useful for grep -r $(...)')
+    parser.add_argument('-f', '--full-path', action='store_true', help='print the full path except the filename of an element')
+    return parser.parse_args()
+
+def get_deleted(full_path=False):
+    import os.path, subprocess
+    
+    command = ["/usr/bin/env", "git", "status", "-s"]
+    for line in subprocess.check_output(command).decode("utf-8").splitlines():
+        if line.startswith(" D "):
+            path = line[3:]
+            if not full_path:
+                _, path = os.path.split(path)
+            if path:
+                yield path
+
+def print_user(deleted):
+    for path in deleted:
+        print(" * {}".format(path))
+
+def print_regex(deleted):
+    import re
+    print("|".join(re.escape(path) for path in deleted))
+
+args = parse_args()
+deleted = get_deleted(args.full_path)
+if args.regex:
+    print_regex(deleted)
+else:
+    print_user(deleted)
