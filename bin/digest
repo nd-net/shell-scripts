@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+
+import hashlib, sys
+
+def parse_args():
+    import argparse
+
+    class FileType(argparse.FileType):
+        def __call__(self, string):
+            try:
+                return super().__call__(string)
+            except Exception as e:
+                print(e, file=sys.stderr)
+                return None
+    
+    choices = {}
+    for algorithm in hashlib.algorithms_available:
+        name = algorithm.lower()
+        name = name.replace("_", "-")
+        choices[name] = algorithm
+    
+    default_algorithm = "sha1"
+    algorithms = list(sorted(i for i in choices if i != default_algorithm))
+    algorithms.insert(0, default_algorithm + " (default)")
+    
+    parser = argparse.ArgumentParser(description="Print digests (checksums)")
+    parser.add_argument('file', nargs='*', type=FileType('rb'), default=[sys.stdin])
+    parser.add_argument('-d', '--dup', action="store_true", help="print only duplicates")
+    parser.add_argument('-a', '--algorithm', metavar="digest", default=default_algorithm, help="the digest algorithm to use, one of:\n" + ", ".join(algorithms))
+    args = parser.parse_args()
+    args.algorithm = choices[args.algorithm]
+    return args
+
+def get_hash(file, algorithm):
+    BLOCKSIZE = 65536
+    hasher = hashlib.new(algorithm)
+    data = file.read(BLOCKSIZE)
+    while len(data) > 0:
+        if isinstance(data, str):
+            data = data.encode("utf-8")
+        hasher.update(data)
+        data = file.read(BLOCKSIZE)
+    return hasher
+    
+def get_digests(files, algorithm):
+    for file in files:
+        if not file:
+            continue
+        try:
+            name = file.name if file != sys.stdin else "-"
+            hasher = get_hash(file, algorithm)
+            yield (hasher.hexdigest(), name)
+        except Exception as e:
+            print(e, file=sys.stderr)
+        try:
+            file.close()
+        except:
+            pass
+
+def duplicate_digests(digests):
+    existing = {}
+    for hash, name in digests:
+        existing.setdefault(hash, []).append(name)
+    for hash, names in existing.items():
+        if len(names) > 1:
+            for name in names:
+                yield (hash, name)
+
+args = parse_args()
+digests = get_digests(args.file, args.algorithm)
+if args.dup:
+    digests = duplicate_digests(digests)
+
+for item in digests:
+    print(*item)

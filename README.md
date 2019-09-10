@@ -1,11 +1,12 @@
 # Shell-Scripts
 Small shell scripts for various purposes:
 
-* `simctl`: simply calls `xcrun simctl` with all parameters if you cannot remember that
+* `digest`: a generic digest tool (think shasum) that optionally only prints files that have the same digest (useful for checking for duplicates)
 * `plist-sort`: sorts the keys of a plist file
-* `xctdiff`: call a diff tool on the output of a XCTAssertEqual for easier comparison
 * `pwd-finder`: prints the path of the topmost Finder window
+* `simctl`: simply calls `xcrun simctl` with all parameters if you cannot remember that
 * `uuniq`: prints unique lines for unsorted sources
+* `xctdiff`: call a diff tool on the output of a XCTAssertEqual for easier comparison
 
 ## Git subcommands
 
