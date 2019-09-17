@@ -3,7 +3,7 @@
 from collections import namedtuple
 
 LegoSet = namedtuple("LegoSet", ("id", "name", "launch_year", "theme_name", "instructions"))
-LegoInstruction = namedtuple("LegoInstruction", ("name", "URL", "alternative"))
+LegoInstruction = namedtuple("LegoInstruction", ("name", "URL", "alternative", "part"), defaults=((1,1),))
 
 def lego_set_fullname(lego_set):
     return f"[{lego_set.id}] {lego_set.name}"
@@ -17,47 +17,74 @@ def get_set_metadata(set_id):
 
 def parse_instruction_metadata(building_instructions):
     import re
-    def filter(value, *expressions):
+    mapping = {
+        "name": "description",
+        "URL": "pdfLocation",
+        "alternative": "isAlternative"
+    }
+    part_matcher = re.compile(r"\b(\d)/(\d)\b")
+    
+    # sort instructions by part (1/2, 2/2) so that they get combined appropriately
+    result = []
+    for building_instruction in building_instructions:
+        value = {k: building_instruction[v] for k, v in mapping.items()}
+        instruction = LegoInstruction(**value)
+        partNumbers = part_matcher.search(instruction.name)
+        part = [int(i) for i in partNumbers.groups()] if partNumbers else [1, 1]
+        instruction = instruction._replace(part=tuple(part))
+        result.append(instruction)
+    
+    result.sort(key=lambda it: (it.alternative, it.part[1], it.part[0], it.name))
+    return result
+    
+def filter_instruction_metadata(instructions):
+    import re
+    iso_size = re.compile(r"[vV][\.\s]*29|\bVA\b")
+    us_size = re.compile(r"[vV][\.\s]*39|\bNA\b")
+    
+    def filter(list, *expressions):
         for expression in expressions:
-            if len(value) == 1:
-                return value
-            filtered = [i for i in value if expression(i["description"])]
+            if len(list) == 1:
+                return list
+            filtered = [i for i in list if expression(i.name)]
             if filtered:
                 value = filtered
         return value
-
-    instructions = {}
-    for instruction in building_instructions:
-        partNumbers = re.findall(r"(\d+)/(\d+)", instruction["description"])
-        part = [int(i) for i in reversed(partNumbers[0])] if partNumbers else [1, 1]
-        part.insert(0, instruction.get("isAlternative", False))
-        instructions.setdefault(tuple(part), []).append(instruction)
-    for val in instructions.values():
-        val.sort(key=lambda it: it["description"])
     
-    legoinstructions = []
-    for item in sorted(instructions.keys()):
-        alternative, to, index = item
-        value = instructions[item]
+    byPart = {}
+    for it in instructions:
+        byPart.setdefault((it.alternative, it.part[1], it.part[0]), []).append(it)
+    for key in sorted(byPart):
+        alternative, to, index = key
+        value = byPart[key]
         if not alternative:
+            # alternative instructions don't have a V29/V39|NA/VA indicator for US or Europe
             value = filter(value, 
-                lambda i: not re.findall(r"[vV][\.\s]*39|\bNA\b", i),
-                lambda i: re.findall(r"[vV][\.\s]*29|\bVA\b", i))
+                lambda i: not us_size.search(i),
+                lambda i: iso_size.search(i)
+            )
         for entry in value:
-            yield LegoInstruction(entry["description"], entry["pdfLocation"], alternative)
+            yield entry
 
 def parse_set_metadata(set_id, metadata):
     products = metadata["products"]
+    
     if len(products) != 1:
         raise NameError(f"The set ID {set_id} has {len(products)} products associated with it")
     product = products[0]
-    id = product["productId"]
-    name = product["productName"]
-    launch_year = product["launchYear"]
-    theme_name = product["themeName"]
-    instructions = parse_instruction_metadata(product["buildingInstructions"])
-    
-    return LegoSet(id, name, launch_year, theme_name, tuple(instructions))
+    mapping = {
+        'id': 'productId',
+        'launch_year': 'launchYear',
+        'name': 'productName',
+        'theme_name': 'themeName',
+        'instructions': 'buildingInstructions',
+    }
+
+    lego_set = LegoSet(**{k: product[v] for k, v in mapping.items()})
+    instructions = lego_set.instructions
+    instructions = parse_instruction_metadata(instructions)
+    instructions = filter_instruction_metadata(instructions)
+    return lego_set._replace(instructions=list(instructions))
 
 def create_pdf(lego_set, name):
     from PyPDF2 import PdfFileReader, PdfFileMerger
