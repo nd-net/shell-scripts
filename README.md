@@ -2,6 +2,7 @@
 Small shell scripts for various purposes:
 
 * `digest`: a generic digest tool (think shasum) that optionally only prints files that have the same digest (useful for checking for duplicates)
+* `legoman-dl`: downloads and merges PDFs for Lego manuals based on a set ID
 * `plist-sort`: sorts the keys of a plist file
 * `pwd-finder`: prints the path of the topmost Finder window
 * `simctl`: simply calls `xcrun simctl` with all parameters if you cannot remember that

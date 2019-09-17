@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+
+from collections import namedtuple
+
+LegoSet = namedtuple("LegoSet", ("id", "name", "launch_year", "theme_name", "instructions"))
+LegoInstruction = namedtuple("LegoInstruction", ("name", "URL", "alternative"))
+
+def lego_set_fullname(lego_set):
+    return f"[{lego_set.id}] {lego_set.name}"
+
+def get_set_metadata(set_id):
+    from urllib.request import urlopen
+    import json
+    
+    with urlopen(f"https://www.lego.com//service/biservice/search?prefixText={set_id}") as response:
+        return json.load(response)
+
+def parse_instruction_metadata(building_instructions):
+    import re
+    def filter(value, *expressions):
+        for expression in expressions:
+            if len(value) == 1:
+                return value
+            filtered = [i for i in value if expression(i["description"])]
+            if filtered:
+                value = filtered
+        return value
+
+    instructions = {}
+    for instruction in building_instructions:
+        partNumbers = re.findall(r"(\d+)/(\d+)", instruction["description"])
+        part = [int(i) for i in reversed(partNumbers[0])] if partNumbers else [1, 1]
+        part.insert(0, instruction.get("isAlternative", False))
+        instructions.setdefault(tuple(part), []).append(instruction)
+    for val in instructions.values():
+        val.sort(key=lambda it: it["description"])
+    
+    legoinstructions = []
+    for item in sorted(instructions.keys()):
+        alternative, to, index = item
+        value = instructions[item]
+        if not alternative:
+            value = filter(value, 
+                lambda i: not re.findall(r"[vV][\.\s]*39|\bNA\b", i),
+                lambda i: re.findall(r"[vV][\.\s]*29|\bVA\b", i))
+        for entry in value:
+            yield LegoInstruction(entry["description"], entry["pdfLocation"], alternative)
+
+def parse_set_metadata(set_id, metadata):
+    products = metadata["products"]
+    if len(products) != 1:
+        raise NameError(f"The set ID {set_id} has {len(products)} products associated with it")
+    product = products[0]
+    id = product["productId"]
+    name = product["productName"]
+    launch_year = product["launchYear"]
+    theme_name = product["themeName"]
+    instructions = parse_instruction_metadata(product["buildingInstructions"])
+    
+    return LegoSet(id, name, launch_year, theme_name, tuple(instructions))
+
+def create_pdf(lego_set, name):
+    from PyPDF2 import PdfFileReader, PdfFileMerger
+    from urllib.request import urlopen
+    from io import BytesIO
+    merger = PdfFileMerger()
+    metadata = {}
+    bookmark = lego_set.name
+
+    for instruction in lego_set.instructions:
+        with urlopen(instruction.URL) as response:
+            buffer = BytesIO(response.read())
+            pdf = PdfFileReader(buffer)
+            metadata.update(pdf.documentInfo)
+            if instruction.alternative:
+                bookmark = instruction.name
+            merger.append(buffer, bookmark=bookmark)
+            bookmark = None
+            
+    metadata.update({
+            "/Author": "Lego",
+            "/Company": "Lego",
+            "/Title": name,
+            "/Producer" : "Lego Instruction Downloader",
+            "/Keywords": ", ".join(str(i) for i in [lego_set.id, lego_set.name, lego_set.theme_name, lego_set.launch_year]),
+            "/Subject": f"Gebrauchsanweisung",
+    })
+    for key in ("/CreationDate", "/ModDate"):
+        if not metadata.get(key):
+            metadata[key] = "D:{lego_set.launch_year}0101000000Z"
+    merger.addMetadata(metadata)
+    return merger
+
+def cleanup(name):
+    import re
+    return re.subn("[^][\(\)^a-zA-Z0-9\. -]", "", name)[0]
+
+def parse_args():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Download PDFs for Lego manuals based on a set ID into the current directory.")
+    parser.add_argument("set_ids", metavar="set-id", nargs="+", help="the ID of a Lego set, typically a 5 or 4 digit number, e.g. 42042 for the Crawler Crane set")
+    parser.add_argument("-fn", "--filename", metavar="template", default="[{id}] {name}", help="the template to use for the file name.\nThe template may contain the following placeholders: {}.\nDefault: '%(default)s'".format(", ".join(LegoSet._fields)))
+    parser.add_argument("-v", "--verbose", action="store_true", help="show verbose progress information")
+    
+    return parser.parse_args()
+
+def process_set(set_id, template, verbose=False):
+    if verbose:
+        print(f"Getting metadata for {set_id}")
+    metadata = get_set_metadata(set_id)
+    lego_set = parse_set_metadata(set_id, metadata)
+    name = template.format(**lego_set._asdict())
+    if verbose:
+        print(f"Downloading PDF for {lego_set.id}: {name}")
+    pdf = create_pdf(lego_set, name)
+    filename = cleanup(name) + ".pdf"
+    if verbose:
+        print(f"Saving PDF for {lego_set.id} {lego_set.name} to {filename}")
+    with open(filename, "wb") as out:
+        pdf.write(out)
+
+if __name__ == "__main__":
+    args = parse_args()
+    for set_id in args.set_ids:
+        try:
+            process_set(set_id, args.filename, args.verbose)
+        except Exception as e:
+            print(e)
