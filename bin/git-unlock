@@ -1,4 +1,10 @@
 #!/bin/sh
-# Removes all .git/index.lock files that mdfind can find, and all in subdirectories of the home directory
-mdfind -name index.lock -0|xargs -0 rmtrash && echo mdfind index.lock finished &
-rmtrash ~/**/.git/index.lock 2>&1 > /dev/null && echo **/.git/index.lock finished &
+# Removes all .git/index.lock files in subdirectories and parent directories of a given directory. If no directory is specified, this uses the current directory
+dir=${1-$PWD}
+echo Removing .git/index.lock in $dir and parents:
+find $dir -name index.lock -size 0 -print0|xargs -0 rm -v
+cd $dir
+while [ $PWD != '/' ]; do
+	cd ..
+	rm .git/index.lock 2> /dev/null && echo $PWD/.git/index.lock
+done
