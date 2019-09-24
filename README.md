@@ -5,6 +5,7 @@ Small shell scripts for various purposes:
 * `extract`: extract compressed files of various formats (zip, rar, bz2, tar+...)
 * `json-pretty`: prettify JSON so that it is more human readable
 * `legoman-dl`: downloads and merges PDFs for Lego manuals based on a set ID
+* `man-pdf`: create a PDF out of a man page and show it in Preview
 * `plist-sort`: sorts the keys of a plist file
 * `pwd-finder`: prints the path of the topmost Finder window
 * `ql`: launch QuickLook on a file
