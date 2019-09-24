@@ -1,0 +1,4 @@
+#!/bin/sh
+# Find Apps (possibly in a given directory)
+dir=${1-/}
+mdfind 'kMDItemContentTypeTree == "com.apple.application"' -onlyin $dir
