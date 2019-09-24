@@ -5,6 +5,7 @@ Small shell scripts for various purposes:
 * `legoman-dl`: downloads and merges PDFs for Lego manuals based on a set ID
 * `plist-sort`: sorts the keys of a plist file
 * `pwd-finder`: prints the path of the topmost Finder window
+* `ql`: launch QuickLook on a file
 * `simctl`: simply calls `xcrun simctl` with all parameters if you cannot remember that
 * `uuniq`: prints unique lines for unsorted sources
 * `xctdiff`: call a diff tool on the output of a XCTAssertEqual for easier comparison
