@@ -1,6 +1,7 @@
 # Shell-Scripts
 Small shell scripts for various purposes:
 
+* `bundle-id`: show the Bundle ID of a macOS app
 * `digest`: a generic digest tool (think shasum) that optionally only prints files that have the same digest (useful for checking for duplicates)
 * `extract`: extract compressed files of various formats (zip, rar, bz2, tar+...)
 * `find-apps`: find macOS apps using mdfind
