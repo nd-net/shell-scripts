@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+
+import sys
+default_replace = {
+    "retain": "strong"
+}
+
+default_order = (
+        "class", # Class property
+        "readonly", "readwrite", # read/write-able
+        "copy", "assign", "strong", "weak", "unsafe_unretained", "retain", # memory management
+        "atomic", "nonatomic",   # atomicity
+        "nonnull", "nullable", "null_unspecified", "null_resettable", # nullability
+)
+
+def parse_args():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Sorts Objective C property attributes.")
+    parser.add_argument('-o', '--order', action='append', help='specify a custom order of attributes. If nothing is specified, then the default is {}'.format(default_order))
+    parser.add_argument('-s', '--substitute', action='append', help='a original=replacement specification for a property attribute. If nothing is specified, then the default is {}'.format(", ".join("=".join(i) for i in default_replace.items())))
+    parser.add_argument('-k', '--keep-unspecified-order', action='store_true', help='by default, all attributes that are not explicitly ordered get sorted alphabetically. This flag skips that.')
+    parser.add_argument('source', nargs='*', help='a file to be processed; defaults to stdin/stdout')
+    args = parser.parse_args()
+    
+    if args.substitute is None:
+        args.substitute = default_replace
+    else:
+        replace = {}
+        for substitution in args.substitute:
+            if "=" not in substitution:
+                print("Skipping substitution '{}' because it does not contain a qualifier", file=sys.stderr)
+                continue
+            k, v = substitution.split("=", 1)
+            replace[k] = v
+        if not replace:
+            print("Not performing any substitutions", file=sys.stderr)
+        args.substitute = replace
+    if args.order is None:
+        args.order = default_order
+    
+    return args
+
+def process_objective_c(text, order, substitute, sort_remaining=True):
+    import re
+    def propertysort(match):
+        prefix = match.group("prefix")
+        suffix = match.group("suffix")
+        attributes = [i.strip() for i in match.group("attributes").split(",")]
+        result = []
+        for element in order:
+            element = substitute.get(element, element)
+            if element in attributes:
+                attributes.remove(element)
+                target = substitute.get(element, element)
+                if target:
+                    result.append(target)
+        
+        if sort_remaining:
+            # sort the remaining attributes - this ensures that getter= is before setter=
+            attributes.sort()
+        # remove empty strings
+        try:
+            while True:
+                attributes.remove("")
+        except ValueError:
+            pass
+        result.extend(attributes)
+        content = ", ".join(result)
+        return "".join((prefix, content, suffix))
+    
+    return re.sub(r"(?P<prefix>@property\s*\()(?P<attributes>[^\(]*)(?P<suffix>\))", propertysort, text)
+
+
+args = parse_args()
+
+def process(text):
+    return process_objective_c(text, args.order, args.substitute, not args.keep_unspecified_order)
+
+if args.source:
+    for file in args.source:
+        try:
+            with open(file, "r+t") as f:
+                text = process(f.read())
+                f.seek(0)
+                f.write(text)
+        except Exception as e:
+            print(e, file=sys.stderr)
+else:
+    print(process(sys.stdin.read()))
