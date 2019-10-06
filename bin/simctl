@@ -1,2 +1,26 @@
 #!/bin/bash
 xcrun simctl "$@"
+if [ "$1" == "help" ]; then
+  cat <<EOF
+Secret commands:
+	keyboard_set_language
+	runtime
+	reset
+	monitor
+	device_io
+	pbinfo
+	register
+	unregister
+	disk
+	darwinup
+	listapps
+	appinfo
+	notify_post
+	notify_get_state
+	notify_set_state
+	bootstatus
+	addphoto
+	addvideo
+	noexit
+EOF
+fi
