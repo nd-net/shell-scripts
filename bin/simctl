@@ -2,25 +2,25 @@
 xcrun simctl "$@"
 if [ "$1" == "help" ]; then
   cat <<EOF
-Secret commands:
+Undocumented commands:
 	keyboard_set_language
-	runtime
-	reset
+	runtime             Locate, copy, mount, and unmount simulator runtime disk images.
+	reset               Reset a given archive or database.
 	monitor
 	device_io
-	pbinfo
-	register
-	unregister
-	disk
-	darwinup
-	listapps
-	appinfo
-	notify_post
-	notify_get_state
-	notify_set_state
+	pbinfo              Print information about the device's pasteboard.
+	register            Register a service from one bootstrap into another.
+	unregister          Unregister a service from a device's bootstrap.
+	disk                Perform disk operations, like simulating volume unmount.
+	darwinup            Invoke darwinup to install a root for the specified simulator runtime.
+	listapps            Show the installed applications.
+	appinfo             Show information about an installed application.
+	notify_post         Post a darwin notification on a device.
+	notify_get_state    Set the state value of a darwin notification on a device.
+	notify_set_state    Get the state value of a darwin notification on a device.
 	bootstatus
-	addphoto
-	addvideo
+	addphoto            Add photos to the photo library of a device.
+	addvideo            Add videos to the photo library of a device.
 	noexit
 EOF
 fi
