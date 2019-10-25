@@ -1,0 +1,9 @@
+#!/bin/sh
+# Remove the macOS quarantine flag from a file
+for file in "$@"; do
+  if xattr -d -v com.apple.quarantine $file 2> /dev/null ; then
+    echo "Quarantine removed from $file"
+  else
+    echo "Quarantine was not set on $file"
+  fi
+done
