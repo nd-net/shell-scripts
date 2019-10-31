@@ -15,6 +15,7 @@ Small shell scripts for various purposes:
 * `qrm`: remove the quarantine flag from a file
 * `simctl`: simply calls `xcrun simctl` with all parameters if you cannot remember that
 * `uuniq`: prints unique lines for unsorted sources
+* `xcode-cleanup`: clean up unused or unnecessary Xcode files
 * `xctdiff`: call a diff tool on the output of a XCTAssertEqual for easier comparison
 
 ## Git subcommands

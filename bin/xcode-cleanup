@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description='Cleanup Xcode.')
+    parser.add_argument("-d", "--derived-data", action="append_const", dest="paths", const="~/Library/Developer/Xcode/DerivedData", help="delete derived data")
+    parser.add_argument("-D", "--device-support", action="append_const", dest="paths", const="~/Library/Developer/Xcode/iOS DeviceSupport", help="delete device support")
+    parser.add_argument("-s", "--simulator-device", dest="device", action="append", help="delete simulator device")
+    parser.add_argument("-S", "--simulator-unavailable", dest="device", action="append_const", const="unavailable", help="delete all unavailable simulator devices")
+    parser.add_argument("-a", "--all", action="store_const", const=["--derived-data", "--simulator-unavailable"], help="alias for %(const)s")
+    parser.add_argument("--dry-run", action="store_true", help="prints which directories would be cleared but don't remove any files")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.set_defaults(paths=[], device=[])
+    args = parser.parse_args()
+    if args.all:
+        import sys
+        args = parser.parse_args(sys.argv[1:] + args.all)
+    if args.dry_run:
+        args.verbose = True
+    return args
+
+def send2trash(path):
+    # Implementation from https://github.com/hsoft/send2trash
+    from ctypes import cdll, byref, Structure, c_char, c_char_p
+    from ctypes.util import find_library
+    Foundation = cdll.LoadLibrary(find_library('Foundation'))
+    CoreServices = cdll.LoadLibrary(find_library('CoreServices'))
+
+    GetMacOSStatusCommentString = Foundation.GetMacOSStatusCommentString
+    GetMacOSStatusCommentString.restype = c_char_p
+    FSPathMakeRefWithOptions = CoreServices.FSPathMakeRefWithOptions
+    FSMoveObjectToTrashSync = CoreServices.FSMoveObjectToTrashSync
+
+    kFSPathMakeRefDefaultOptions = 0
+    kFSPathMakeRefDoNotFollowLeafSymlink = 0x01
+
+    kFSFileOperationDefaultOptions = 0
+    kFSFileOperationOverwrite = 0x01
+    kFSFileOperationSkipSourcePermissionErrors = 0x02
+    kFSFileOperationDoNotMoveAcrossVolumes = 0x04
+    kFSFileOperationSkipPreflight = 0x08
+
+    class FSRef(Structure):
+        _fields_ = [('hidden', c_char * 80)]
+
+    def check_op_result(op_result):
+        if op_result:
+            msg = GetMacOSStatusCommentString(op_result).decode('utf-8')
+            raise OSError(msg)
+    
+    path = path.encode('utf-8')
+    fp = FSRef()
+    opts = kFSPathMakeRefDoNotFollowLeafSymlink
+    op_result = FSPathMakeRefWithOptions(path, opts, byref(fp), None)
+    check_op_result(op_result)
+    opts = kFSFileOperationDefaultOptions
+    op_result = FSMoveObjectToTrashSync(byref(fp), None, opts)
+    check_op_result(op_result)
+
+def remove_path(path, verbose, dry_run):
+    import os
+    full_path = os.path.expanduser(path)
+    if not os.path.exists(full_path):
+        return
+    if verbose:
+        print("Remove path: {}".format(path))
+    if not dry_run:
+        send2trash(full_path)
+
+def remove_simulators(devices, verbose, dry_run):
+    if not devices:
+        return
+    command = ["/usr/bin/env", "xcrun", "simctl", "delete"] + devices
+    if verbose:
+        print("Remove simulators: Executing '{}'".format(" ".join(command[1:])))
+    if not dry_run:
+        import subprocess
+        subprocess.check_call(command)
+
+args = parse_args()
+for path in args.paths:
+    remove_path(path, args.verbose, args.dry_run)
+remove_simulators(args.device, args.verbose, args.dry_run)    
