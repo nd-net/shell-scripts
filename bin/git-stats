@@ -1,3 +1,57 @@
-#!/bin/bash
+#!/usr/bin/env python3
 
-git log --shortstat --author="$(git config user.name)" "$@" | grep -E "fil(e|es) changed" | awk '{files+=$1; inserted+=$4; deleted+=$6; delta+=$4-$6; ratio=deleted/inserted} END {printf "Commit stats:\n- Files changed (total)..  %s\n- Lines added (total)....  %s\n- Lines deleted (total)..  %s\n- Total lines (delta)....  %s\n- Add./Del. ratio (1:n)..  1 : %s\n", files, inserted, deleted, delta, ratio }' -
+def parse_args():
+    import argparse
+    
+    parser = argparse.ArgumentParser("Show git statistics")
+    parser.add_argument("--all", help="show all authors and not just the currently configured one.")
+    known, unknown = parser.parse_known_args()
+    known.git_args = unknown
+    return known
+
+def git(*args):
+    import subprocess
+    return subprocess.check_output(("/usr/bin/env", "git") + args, encoding="utf-8")
+
+def calc_stats(output):
+    import re
+    
+    values = {
+        "files": 0,
+        "inserted": 0,
+        "deleted": 0,
+    }
+    
+    for match in re.finditer(r"(?P<files>\d+) files? changed(, (?P<inserted>\d+) insertions?\(\+\))?(, (?P<deleted>\d+) deletions?\(\-\))?", output):
+        for key in values:
+            value = match[key]
+            if not value:
+                continue
+            values[key] += int(value)
+    
+    deleted = values["deleted"]
+    inserted = values["inserted"]
+    values["delta"] = inserted - deleted
+    try:
+        values["ratio"] = deleted / inserted
+    except ZeroDivisionError:
+        values["ratio"] = float("inf")
+    return values
+
+def format_stats(stats):
+    return """Commit stats:
+- Files changed (total).. {files}
+- Lines added (total).... {inserted}
+- Lines deleted (total).. {deleted}
+- Total lines (delta).... {delta}
+- Add./Del. ratio (1:n).. 1 : {ratio}""".format(**stats)
+
+git_args = ["log", "--shortstat"]
+args = parse_args()
+if not args.all:
+    author = git("config", "user.name").strip()
+    git_args.append("--author={}".format(author))
+git_args.extend(args.git_args)
+
+stats = calc_stats(git(*git_args))
+print(format_stats(stats))
