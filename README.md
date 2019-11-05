@@ -13,7 +13,8 @@ Small shell scripts for various purposes:
 * `pwd-finder`: prints the path of the topmost Finder window
 * `ql`: launch QuickLook on a file
 * `qrm`: remove the quarantine flag from a file
-* `simctl`: simply calls `xcrun simctl` with all parameters if you cannot remember that
+* `refresh-open-with`: Updates the launch services database, eliminating dead or duplicate entries in the "Open With" menu
+* `simctl`: calls `xcrun simctl` with all parameters if you cannot remember that, and shows help for undocumented commands
 * `uuniq`: prints unique lines for unsorted sources
 * `xcode-cleanup`: clean up unused or unnecessary Xcode files
 * `xctdiff`: call a diff tool on the output of a XCTAssertEqual for easier comparison
