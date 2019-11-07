@@ -9,7 +9,10 @@ def sortedDict(value, key=None):
     from collections import OrderedDict
     if not isinstance(value, dict):
         return value
-    return OrderedDict((key, sortedDict(value[key], key=key)) for key in sorted(value, key=key))
+    result = OrderedDict()
+    for item in sorted(value, key=key):
+        result[item] = sortedDict(value[item], key=key)
+    return result
 
 def sort(file, format, key=None):
     data = plistlib.load(file)
