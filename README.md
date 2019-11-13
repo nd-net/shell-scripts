@@ -5,6 +5,7 @@ Small shell scripts for various purposes:
 * `digest`: a generic digest tool (think shasum) that optionally only prints files that have the same digest (useful for checking for duplicates)
 * `extract`: extract compressed files of various formats (zip, rar, bz2, tar+...)
 * `find-apps`: find macOS apps using mdfind
+* `jenkins-env`: convert the (text) content of Jenkins's "Environment variables" page into commands that can be used to set the environment
 * `json-pretty`: prettify JSON so that it is more human readable
 * `legoman-dl`: downloads and merges PDFs for Lego manuals based on a set ID
 * `man-pdf`: create a PDF out of a man page and show it in Preview

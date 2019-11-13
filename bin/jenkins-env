@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+import sys
+
+def parse_args():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Convert the environment variables pages from Jenkins into a something useful for shell-scripts.")
+    parser.add_argument('--format', default='{name}="{value}"', help="The format which the values should have. {name} represents the name of the key, {value} its value.")
+    return parser.parse_args()
+
+def convert(source, format="{name}={value}"):
+    import re
+    return "\n".join(format.format(name=match.group(1), value=match.group(2)) for match in re.finditer(r'^(\w+)\t(.*)$', source, re.MULTILINE))
+
+args = parse_args()
+print(convert(sys.stdin.read(), format=args.format))
