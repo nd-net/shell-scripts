@@ -8,6 +8,7 @@ Small shell scripts for various purposes:
 * `jenkins-env`: convert the (text) content of Jenkins's "Environment variables" page into commands that can be used to set the environment
 * `json-pretty`: prettify JSON so that it is more human readable
 * `legoman-dl`: downloads and merges PDFs for Lego manuals based on a set ID
+* `mail-cleanup`: Perform a sqlite vacuum on Mail's index
 * `man-pdf`: create a PDF out of a man page and show it in Preview
 * `objc-attributesort`: sorts Objective C property attributes
 * `plist-sort`: sorts the keys of a plist file
