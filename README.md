@@ -29,6 +29,7 @@ Small shell scripts for various purposes:
 The following commands can be invoked via `git <subcommand>` as well as with `git-<subcommand>`.
 
 * `git-deleted`: prints all deleted and not yet commited files in the current repository. Optionally prints a regex that can be used for grepping the filenames somewerhe else
+* `git-duplicate`: duplicates a git repository at a given location with all checked out branches
 * `git-refresh-tags`: a shortcut for `git fetch --prune-tags --tags -f`, updates tags that's references have changed
 * `git-stats`: prints statistics for commits of the current user
 * `git-unlock`: removes all .git/index.lock files that mdfind can find, and all in subdirectories of the home directory

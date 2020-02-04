@@ -1,0 +1,9 @@
+#!/bin/sh
+
+mkdir "$2"
+cd "$2"
+git clone --bare "$1" .git
+git config --unset core.bare
+git reset --hard
+
+
