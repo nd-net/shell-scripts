@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+
+def parse_args():
+    import argparse, os
+    default_mapping = "~/.config/tag-pdf/mapping"
+    
+    parser = argparse.ArgumentParser(description='Tag PDF files according to their content')
+    parser.add_argument('--pip', '--install', action="store_true", help='Install dependencies for this via pip')
+    parser.add_argument('--verbose', '-v', action='count', default=0, help="Give more output. Option is additive, and can be used up to 2 times.")
+    parser.add_argument('-m', '--mapping', metavar="CONFIG", default=os.path.expanduser(default_mapping), type=argparse.FileType('r'), help=f"The mapping file that should be used (default {default_mapping})")
+    parser.add_argument('-d', '--max-distance', metavar="DISTANCE", default=3, help="The maximum distance a PDF text should be from the search pattern (Default %(default)s)")
+    parser.add_argument("files", metavar="FILE", nargs="+", help="The files that should be tagged.")
+    
+    return parser.parse_args()
+
+def pip(verbose=0):
+    packages = ["fuzzysearch", "pdfminer.six"]
+    if verbose > 0:
+        print("Installing Python packages")
+        for package in packages:
+            print("    " + package)
+    import subprocess, sys
+    template = [sys.executable, "-m", "pip", "install"]
+    if verbose == 0:
+        template.append("-q")
+    for package in packages:
+        call = template + [package]
+        if verbose > 1:
+            print("Running " + " ".join(call))
+        subprocess.call(call)
+
+def parse_mapping(source, verbose=0):
+    result = {}
+    import re
+    
+    pattern = re.compile(r"^(?P<keysep>[\"']?)(?P<key>.*?)\1\s*=\s*(?P<valuesep>[\"']?)(?P<value>.*?)\3\s*$")
+    if verbose > 1:
+        print(f"Parsing {source.name}")
+
+    for line in source:
+        if not line or line.startswith("#"):
+            continue
+        match = pattern.match(line)
+        if match:
+            key, value = match["key"], match["value"]
+            result.setdefault(key, set()).add(value)
+        else:
+            if verbose > 1:
+                print("{line} does not match; ignoring line")
+    if verbose > 2:
+        def sep(v):
+            r = "'" if '"' in key else '"'
+            return r + v + r
+
+        for key, values in result.items():
+            for value in values:
+                print(sep(key) + " = " + sep(value))
+    return result
+
+def text(pdf_file, verbose=0):
+    from pdfminer.high_level import extract_text
+    if verbose > 1:
+        print(f"Getting text from {pdf_file}")
+    return extract_text(pdf_file)
+
+def find_tags(text, config, max_l_dist, verbose=0):
+    from fuzzysearch import find_near_matches
+    ltext = text.lower()
+    result = set()
+    for choice, tags in config.items():	
+        matches = find_near_matches(choice.lower(), ltext, max_l_dist=max_l_dist)
+        if not matches:
+            if verbose > 2:
+                print(f"No matches for {choice}")
+            continue
+        result.update(tags)
+        if verbose > 0:
+            print(f"Got a match for {choice} = {', '.join(tags)}")
+        if verbose > 1:
+            for match in matches:
+                print(f"   {text[match.start:match.end]}")
+    return result
+
+def tag(file, tags, verbose=0):
+    if not tags:
+        return
+    if verbose > 0:
+        print(f"Tagging {file} with {', '.join(tags)}")
+    command = ["/usr/local/bin/tag", "--add", ",".join(tags), file]
+    if verbose > 2:
+        print("Running " + " ".join(command))
+    import subprocess
+    subprocess.call(command)
+
+if __name__ == "__main__":
+    args = parse_args()
+    global verbose
+    if args.pip:
+        pip(verbose=args.verbose)
+    config = parse_mapping(args.mapping, verbose=args.verbose)
+    for file in args.files:
+        t = text(file)
+        tags = find_tags(t, config, args.max_distance, verbose=args.verbose)
+        tag(file, tags, verbose=args.verbose)
+    
