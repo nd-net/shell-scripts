@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description="Parse a CUE sheet and create ffmpeg command lines for it")
+    parser.add_argument("input", type=argparse.FileType("rt"), help="The cue sheet to process")
+    parser.add_argument("-f", "--file", help="Use a different file that the one defined by the FILE property of the cue sheet")
+    parser.add_argument("-b", "--bitrate", default="320k", help="The bitrate for the resulting Audio")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show verbose information")
+    parser.add_argument("-d", "--dry-run", action="store_true", help="Do not run the ffmpeg command")
+    return parser.parse_args()
+
+def parse_time(msf):
+    m, s, f = msf.split(":")
+    return int(m) * 60 + int(s) + int(f) / 75
+
+def format_time(msf):
+    m = int(msf // 60)
+    s = msf - m * 60
+    return "{m}:{s:02}".format(m=m, s=s)
+
+def parse_cue(input, input_file=None):
+    tracks = []
+    import re
+    filepattern = {
+        "genre": re.compile(r'REM GENRE\s+(.+)'),
+        "date": re.compile(r'REM DATE\s+(.+)'),
+        "artist": re.compile(r'PERFORMER\s+(.+)'),
+        "album": re.compile(r'TITLE\s+(.+)'),
+        "file": re.compile(r'FILE\s+(.+)\s+\w+'),
+    }
+    
+    trackpattern = {
+        "track_number": re.compile(r"\s+TRACK\s+(\d+)"),
+        "title": re.compile(r'\s+TITLE\s+(.+)'),
+        "artist": re.compile(r'\s+PERFORMER\s+(.+)'),
+        "start": re.compile(r'\s+INDEX 01\s+(\d+:\d\d:\d\d)'),
+    }
+    
+    file = {}
+    track = {}
+    for line in input:
+        for name, pattern in filepattern.items():
+            match = pattern.match(line)
+            if match:
+                file[name] = match.groups()[0]
+        for name, pattern in trackpattern.items():
+            match = pattern.match(line)
+            if match:
+                if name == "track_number":
+                    track = dict(file)
+                    tracks.append(track)
+                track[name] = match.groups()[0]
+    
+    for track in tracks:
+        for k, v in track.items():
+            track[k] = v.replace('"', "")
+        track["start_time"] = parse_time(track["start"])
+    for track, next in zip(tracks, tracks[1:]):
+        track['duration'] = next["start_time"] - track["start_time"]
+    for track in tracks:
+        track["track"] = "{track_number}/{tracks}".format(tracks=len(tracks), **track)
+        if input_file:
+            track["file"] = input_file
+        else:
+            import os.path
+            path, _ = os.path.split(input.name)
+            track["file"] = os.path.join(path, track["file"])
+
+    return tracks
+
+def ffmpeg(tracks, bitrate):
+    for track in tracks:
+        cmd = ['ffmpeg', '-i', track["file"], '-b:a', bitrate, '-ss', format_time(track["start_time"])]
+
+        try:
+            cmd.extend(['-t', format_time(track["duration"])])
+        except:
+            pass
+
+        for item in ("artist", "title", "album", "tracks", "genre", "date"):
+            try:
+                cmd.extend(['-metadata', '{}={}'.format(item, track[item])])
+            except:
+                pass
+        cmd.append('{track_number} - {artist} - {title}.mp3'.format(**track))
+        yield cmd
+
+args = parse_args()
+if args.dry_run:
+    args.verbose = True
+tracks = parse_cue(args.input, args.file)
+for cmd in ffmpeg(tracks, args.bitrate):
+    import subprocess
+    if args.verbose:
+        print(" ".join('"{}"'.format(i) if " " in i else i for i in cmd))
+    if not args.dry_run:
+        subprocess.run(["/usr/bin/env"] + cmd)
