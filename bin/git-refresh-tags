@@ -1,3 +1,2 @@
 #!/bin/sh
-
-git fetch --prune-tags --tags -f "$*"
+git fetch --prune-tags --tags -f "$@"
