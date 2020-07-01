@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+shells = ["zsh", "bash", "tcsh", "csh", "sh"]
+paths = ["/usr/local/bin", "/usr/bin", "/bin", "/sbin"]
+
+def parse_args():
+  import argparse
+  
+  parser = argparse.ArgumentParser(description="Run a shell inside a jail")
+  parser.add_argument("jail", help="The name or ID of the jail where the shell should be run.")
+  parser.add_argument("-s", "--sh", action="append", help="Add the name of a shell to use. If you do not specify any shell, then these shells will be searched: {}".format(", ".join(shells)))
+  parser.add_argument("-p", "--path", action="append", help="Add a path inside the jail to search. If you do not specify any path, then these paths will be searched: {}".format(", ".join(paths)))
+  parser.add_argument("-S", "--sudo", action="store_true", help="Run jexec via sudo.")
+  return parser.parse_args()
+
+def jls():
+  import re, subprocess
+  from collections import namedtuple
+  Jail = namedtuple("Jail", "id name path")
+  data = subprocess.check_output(["/usr/bin/env", "jls"]).decode("utf8")
+  result = []
+  for match in re.finditer(r"(?P<id>\d+)\s+(?P<name>\w+).*?(?P<path>\S+)", data):
+    result.append(Jail(match["id"], match["name"], match["path"]))
+  return result
+  
+def find_jail(name, jails):
+  for index in (1, 0):
+    for jail in jails:
+      if jail[index] == name:
+        return jail
+  raise KeyError("Could not find jail {}".format(name))
+
+def find_shell(jail, paths, shells):
+  import os
+  for shell in shells:
+    for path in paths:
+      jailpath = os.path.join(path, shell)
+      fullpath = os.path.join(jail.path, jailpath[1:])
+      if os.path.exists(fullpath):
+        return jailpath
+  raise KeyError("Could not find shell for {}".format(jail.name))
+
+def jexec(jail, path, sudo):
+  args = ["jexec", jail.id, path]
+  if sudo:
+    args.insert(0, "sudo")
+  import os
+  os.execvp(args[0], args)
+
+args = parse_args()
+jail = find_jail(args.jail, jls())
+path = find_shell(jail, args.path or paths, args.sh or shells)
+jexec(jail, path, args.sudo)

@@ -7,6 +7,7 @@ Small shell scripts for various purposes:
 * `extract`: extract compressed files of various formats (zip, rar, bz2, tar+...)
 * `find-apps`: find macOS apps using mdfind
 * `jenkins-env`: convert the (text) content of Jenkins's "Environment variables" page into commands that can be used to set the environment
+* `jsh`: run a shell inside a FreeBSD jail
 * `json-merge-patch`: Diff JSON files, or patch a JSON file with an existing diff,
 * `json-pretty`: prettify JSON so that it is more human readable
 * `legoman-dl`: downloads and merges PDFs for Lego manuals based on a set ID
