@@ -15,9 +15,10 @@ def parse_time(msf):
     return int(m) * 60 + int(s) + int(f) / 75
 
 def format_time(msf):
-    m = int(msf // 60)
-    s = msf - m * 60
-    return "{m}:{s:02}".format(m=m, s=s)
+    h = int(msf // 3600)
+    m = int(msf // 60) - h * 60
+    s = msf - m * 60 - h * 3600
+    return "{h}:{m:02}:{s:02}".format(h=h, m=m, s=s)
 
 def parse_cue(input, input_file=None):
     tracks = []
