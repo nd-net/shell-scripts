@@ -21,6 +21,7 @@ Small shell scripts for various purposes:
 * `refresh-open-with`: Updates the launch services database, eliminating dead or duplicate entries in the "Open With" menu
 * `simctl`: calls `xcrun simctl` with all parameters if you cannot remember that, and shows help for undocumented commands
 * `tag-pdf`: Perform a fuzzy search on a given PDF file and tag it
+* `update-nib-colors`: Replace literal colors in storyboards and xib files by named colors
 * `uuniq`: prints unique lines for unsorted sources
 * `xcode-cleanup`: clean up unused or unnecessary Xcode files
 * `xctdiff`: call a diff tool on the output of a XCTAssertEqual for easier comparison

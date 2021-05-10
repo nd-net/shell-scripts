@@ -1,0 +1,441 @@
+#!/usr/bin/python3
+
+import collections
+
+verbosity = 0
+def log(level, message, *args, **kwargs):
+    if verbosity < level:
+        return
+    message = message.format(*args, **kwargs)
+    print(message)
+
+class UIColor(collections.namedtuple('UIColor', ['red', 'green', 'blue', 'alpha'], defaults=[1])):
+    """An color.
+    A tuple of four floats in the 0..1 range: ``(r, g, b, a)``.
+    Also has ``red``, ``green``, ``blue`` and ``alpha`` attributes to access
+    the same values.
+    """
+    
+    def fromHSB(hue, saturation, brightness, alpha=1):
+        if brightness <= .5:
+            t2 = brightness * (saturation + 1)
+        else:
+            t2 = brightness + saturation - brightness * saturation
+        t1 = brightness * 2 - t2
+        h6 = hue * 6
+        def toRGB(factor):
+            nonlocal t1, t2, h6
+            h = h6 + factor
+            if h < 0:
+                h += 6
+            elif h >= 6:
+                h -= 6
+            if h < 1:
+                return (t2 - t1) * h + t1
+            elif h < 3:
+                return t2
+            elif h < 4:
+                return (t2 - t1) * (4 - h) + t1
+            else:
+                return t1
+        return UIColor(toRGB(+2), toRGB(0), toRGB(-2), alpha)
+    
+    def fromDict(source):
+        colorspace = source.get("color-space") or source.get("customColorSpace")
+        if colorspace in ("calibratedWhite", "gray-gamma-22", "extended-gray"):
+            fields = ["white", "alpha"]
+        else:
+            fields = UIColor._fields
+        
+        values = []
+        components = source.get("components") or source
+        for field in fields:
+            text = components.get(field)
+            if text.startswith("0x") or text.startswith("0X"):
+                value = int(text, 16) / 0xff
+            else:
+                value = float(text)
+            values.append(value)
+        if len(fields) == 2:
+            values = [values[0]] * 3 + values[1:]
+        return UIColor(*values)
+
+class ColorParser:
+
+    def __init__(self, input):
+        self.input = input
+
+    def clamp01(self, source):
+        if source < 0:
+            return 0
+        elif source > 1:
+            return 1
+        else:
+            return source
+
+    def expect(self, *patterns):
+        for pattern in patterns:
+            if len(self.input) >= len(pattern) and self.input[:len(pattern)].lower() == pattern:
+                self.input = self.input[len(pattern):]
+                return True
+        return False
+
+    def skip_whitespace(self):
+        self.input = self.input.lstrip()
+
+    def skip_comma_separated(self):
+        self.skip_whitespace()
+        self.expect(",")
+        self.skip_whitespace()
+
+    def parse_number(self):
+        import re
+        match = re.search(r"[\+\-]?\d*\.\d*", self.input)
+        value = match.group(0) if match else ""
+        self.input = self.input[len(value):]
+        return float(value)
+
+    def parse_number_or_percentage(self):
+        value = self.parse_number()
+        if self.expect("%"):
+            return (value / 100, True)
+        else:
+            return (value, False)
+
+    def parse_percentage(self):
+        value, percentage = self.parse_number_or_percentage()
+        return value if percentage else None
+
+    def parse_alpha(self):
+        self.skip_whitespace()
+        if self.expect(",", "/"):
+            self.skip_whitespace()
+            alpha, _ = self.parse_number_or_percentage()
+            self.skip_whitespace()
+            return self.clamp01(alpha)
+        else:
+            return 1
+
+    def parse_hash(self):
+        components = []
+        if len(self.input) in (6, 8):
+            return UIColor(*[int(self.input[i:i+2], 16) / 0xff for i in range(0, len(self.input), 2)])
+        elif len(self.input) in (3, 4):
+            return UIColor(*[int(i, 16) / 0xf for i in self.input])
+        else:
+            return None
+
+    def parse_rgb(self):
+        red, _ = self.parse_number_or_percentage()
+        self.skip_comma_separated()
+        green, _ = self.parse_number_or_percentage()
+        self.skip_comma_separated()
+        blue, _ = self.parse_number_or_percentage()
+        alpha = self.parse_alpha()
+        if self.expect(")"):
+            return UIColor(red, green, blue, alpha)
+        else:
+            return None
+
+    def parse_hsl(self):
+        import math
+        self.skip_whitespace()
+        hue = self.parse_number()
+        self.skip_whitespace()
+        if self.expect("deg"):
+            hue /= 360
+        elif self.expect("grad"):
+            hue /= 400
+        elif self.expect("rad"):
+            hue /= 2 * math.pi
+        elif self.expect("turn"):
+            pass
+        else:
+            hue /= 360
+        # normalize
+        hue = hue - math.floor(hue)
+        self.skip_comma_separated()
+        saturation = self.clamp01(self.parse_percentage())
+        self.skip_comma_separated()
+        brightness = self.clamp01(self.parse_percentage())
+        alpha = self.parse_alpha()
+    
+        if self.expect(")"):
+            return UIColor.fromHSB(hue, saturation, brightness, alpha)
+        else:
+            return None
+
+    def parse(self):
+        if self.expect("#"):
+            return self.parse_hash()
+        elif self.expect("rgb(", "UIColor("):
+            return self.parse_rgb()    
+        elif self.expect("hsl(", "hsla("):
+            return self.parse_hsl()
+        else:
+            return None
+
+class NIB:
+    
+    def __init__(self, doc):
+        self.doc = doc
+    
+    def parse(input):
+        from xml.etree.ElementTree import parse
+        return NIB(parse(input))
+    
+    def indent(self, space="    ", level=0):
+        tree = self.doc.getroot()
+        if not len(tree):
+            return
+
+        # Reduce the memory consumption by reusing indentation strings.
+        indentations = ["\n" + level * space]
+
+        def _indent_children(elem, level):
+            # Start a new indentation level for the first child.
+            child_level = level + 1
+            try:
+                child_indentation = indentations[child_level]
+            except IndexError:
+                child_indentation = indentations[level] + space
+                indentations.append(child_indentation)
+
+            if not elem.text or not elem.text.strip():
+                elem.text = child_indentation
+
+            for child in elem:
+                if len(child):
+                    _indent_children(child, child_level)
+                if not child.tail or not child.tail.strip():
+                    child.tail = child_indentation
+
+            # Dedent after the last child by overwriting the previous indentation.
+            if not child.tail.strip():
+                child.tail = indentations[level]
+
+        _indent_children(tree, 0)
+    
+    def _escape(self, text, replacements):
+        for source, target in replacements:
+            if source in text:
+                text = text.replace(source, target)
+        return text
+
+    def _serialize_xml(self, write, elem):
+        from xml.etree.ElementTree import Comment, ProcessingInstruction
+
+        cdataReplacements = (("&", "&amp;"), ("<", "&lt;"), (">", "&gt;"))
+        attribReplacements = cdataReplacements + (('"', "&quot;"), ("\r", "&#13;"), ("\n", "&#10;"), ("\t", "&#09;"))
+
+        tag = elem.tag
+        text = elem.text
+        if tag is Comment:
+            write("<!--%s-->" % text)
+        elif tag is ProcessingInstruction:
+            write("<?%s?>" % text)
+        else:
+            if tag is None:
+                if text:
+                    write(self._escape(text, cdataReplacements))
+                for e in elem:
+                    _serialize_xml(write, e)
+            else:
+                write("<" + tag)
+                items = list(elem.items())
+                if items:
+                    for k, v in items:
+                        v = self._escape(v, attribReplacements)
+                        write(" %s=\"%s\"" % (k, v))
+                if text or len(elem):
+                    write(">")
+                    if text:
+                        write(self._escape(text, cdataReplacements))
+                    for e in elem:
+                        self._serialize_xml(write, e)
+                    write("</" + tag + ">")
+                else:
+                    write("/>")
+        if elem.tail:
+            write(self._escape(elem.tail, cdataReplacements))
+
+    def write(self, write):
+        """Writes the NIB in a format that is as close to the Xcode version as possible"""
+        write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        self._serialize_xml(write, self.doc.getroot())
+        write("\n")
+
+class ColorReplacer:
+    
+    def __init__(self, nib):
+        self.nib = nib
+    
+    def matches(self, left, right, epsilon):
+        for index in range(len(left)):
+            a = left[index]
+            b = right[index]
+            if abs(a - b) > epsilon:
+                log(3, "{0}.{2} != {1}.{2} (epsilon {3})", left, right, left._fields[index], epsilon)
+                return False
+        log(2, "{} == {} (epsilon {})", left, right, epsilon)
+        return True
+
+    def findLiteralColors(self):
+        colors = self.nib.doc.findall("objects//color")
+        for color in colors:
+            key = color.get("key")
+            try:
+                uicolor = UIColor.fromDict(color)
+                yield (color, key, uicolor)
+            except:
+                pass
+
+    def findMatch(self, uicolor, replacements, epsilon):
+        for value, name in replacements.items():
+            if self.matches(value, uicolor, epsilon):
+                return (name, value)
+        return (None, None)
+
+
+    def replace(self, replacements, epsilon):
+        from xml.etree.ElementTree import Element
+        
+        replaced = {}
+        literal = set()
+        for color, key, uicolor in self.findLiteralColors():
+            log(3, "Checking {}: {}", key, color.attrib)
+            name, value = self.findMatch(uicolor, replacements, epsilon)
+            if name and value:
+                replaced[name] = value
+                color.attrib = {
+                    "key": key,
+                    "name": name,
+                }
+            else:
+                literal.add(uicolor)
+        return (replaced, literal)
+    
+    def updateNamedColors(self, colors):
+        from xml.etree.ElementTree import Element
+
+        if not colors:
+            return
+        dependencies = self.nib.doc.find("./dependencies")
+        if dependencies and not dependencies.find("./capability[@name='Named colors']"):
+            dependencies.append(Element("capability", {
+                "name": "Named colors",
+                "minToolsVersion": "9.0",
+            }))
+        resources = self.nib.doc.find("./resources")
+        if not resources:
+            resources = Element("resources")
+            self.nib.doc.getroot().append(resources)
+        for name, value in colors.items():
+            if resources.find("./namedColor[@name='{}']".format(name)):
+                continue
+            namedColor = Element("namedColor", {"name": name})
+            attrs = value._asdict()
+            for k in attrs:
+                attrs[k] = str(attrs[k])
+            attrs["colorSpace"] = "custom"
+            attrs["customColorSpace"] = "sRGB"
+            namedColor.append(Element("color", attrs))
+            resources.append(namedColor)
+
+def parse_args():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Replace colors used in Storyboard or XIB files by named colors")
+    parser.add_argument("-c", "--color", dest="colors", action="append", help="A mapping using <name>=<color>, where <color> is a valid CSS color.")
+    parser.add_argument("-s", "--colorset", dest="colorsets", action="append", help="Xcasset colorsets in JSON format. The name of the color is automatically derived from the file path to the closest xcasset directory. This parameter may specify a (xcasset) directory, with all sub-directories being used")
+    parser.add_argument("-e", "--epsilon", type=float, default=0.005, help="The Epsilon when comparing floating points. A number is assumed to be the same if it is less than +/- Epsilon from another one.")
+    parser.add_argument("-p", "--print-literal-colors", action="store_true", help="If set, then print all remaining literal colors")
+    parser.add_argument("-v", "--verbose", dest="verbosity", action="count", default=0)
+    parser.add_argument("files", type=argparse.FileType("r+t"), metavar="FILE", nargs="+", help="The file to process")
+    return parser.parse_args()
+
+def parse_color(input):
+    try:
+        key, value = input.split("=", 1)
+        color = ColorParser(value).parse()
+    except:
+        color = None
+    if color:
+        log(2, "Replacement {}={}", key, color)
+        return ((color, key), )
+    else:
+        log(0, "Cannot parse color replacement {}", input)
+        return ()
+
+def parse_colorset(input):
+    from pathlib import Path
+    import json
+        
+    colorsets = []
+    path = Path(input)
+    roots = []
+    if path.suffix == ".colorset":
+        roots = [path]
+    roots.extend(path.rglob("*.colorset"))
+    log(2, "Checking the paths for {}: {}", input, roots)
+    for path in roots:
+        if not path.is_dir():
+            continue
+        try:
+            with open(path / "Contents.json") as f:
+                content = json.load(f)
+            log(4, "Got colorset {}", content["colors"][0]["color"])
+            color = UIColor.fromDict(content["colors"][0]["color"])
+            log(3, "Found colorset {} in {}", color, path)
+            path = path.resolve()
+            name = [path.stem]
+            path = path.parent
+            while path.suffix != ".xcassets" and path.parent != path:
+                try:
+                    with open(path / "Contents.json") as f:
+                        content = json.load(f)
+                        if content["properties"]["provides-namespace"]:
+                            name.append(path.name)
+                except:
+                    pass
+                path = path.parent
+            name.reverse()
+            yield (color, "/".join(name))
+        except:
+            continue
+
+def parse_replacements(colors=None, colorsets=None):
+    replacements = {}
+    for item in colors or ():
+        replacements.update(parse_color(item))
+    for item in colorsets or ():
+        replacements.update(parse_colorset(item))
+    log(1, "Using replacements {}", replacements)
+    return replacements
+
+def replace_colors(file, replacements, epsilon, print_literal_colors):
+    import io
+
+    nib = NIB.parse(file)
+    replacer = ColorReplacer(nib)
+    replaced, literal = replacer.replace(replacements, epsilon)
+    if print_literal_colors and literal:
+        log(0, "Literal colors for {}: {}", file.name, literal)
+    if not replaced:
+        return
+    replacer.updateNamedColors(replaced)
+
+    nib.indent()
+
+    file.seek(0, io.SEEK_SET)
+    nib.write(file.write)
+    file.truncate()
+
+if __name__ == "__main__":
+    args = parse_args()
+    verbosity = args.verbosity
+
+    replacements = parse_replacements(args.colors, args.colorsets)
+        
+    for file in args.files:
+        replace_colors(file, replacements, args.epsilon, args.print_literal_colors)
