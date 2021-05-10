@@ -19,6 +19,7 @@ def sort(file, format, key=None):
     sortedData = sortedDict(data, key)
     file.seek(0)
     plistlib.dump(sortedData, file, fmt=format)
+    file.truncate()
     file.close()
 
 def parse_args():
