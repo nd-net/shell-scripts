@@ -13,9 +13,9 @@ def parse_args():
 def find_differences(text):
     import re
     groups = ("left", "right")
-    pattern = r'\"(?P<{}>.*)\"\) is not equal to \(\"(?P<{}>.*)\"'.format(*difference._fields)
+    pattern = r'\"(?P<{}>.*)\"\) is not equal to \(\"(?P<{}>.*)\"'.format(*groups)
     for match in re.finditer(pattern, text, re.DOTALL):
-        yield difference._make(match.group(field) for field in difference._fields)
+        yield difference._make(match.group(field) for field in groups)
 
 def run_difftool(tool_command, difference):
     import os, tempfile, subprocess
