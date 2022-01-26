@@ -1,6 +1,7 @@
 # Shell-Scripts
 Small shell scripts for various purposes:
 
+* `add-dock-spacer`: Add spacers to the dock to make visually distinct groups
 * `bundle-id`: show the Bundle ID of a macOS app
 * `cue-convert`: convert an audio file with a structure given in a .cue file into separate files
 * `digest`: a generic digest tool (think shasum) that optionally only prints files that have the same digest (useful for checking for duplicates)

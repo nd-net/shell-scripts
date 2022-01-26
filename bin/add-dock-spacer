@@ -1,0 +1,52 @@
+#!/bin/sh
+
+function usage {
+    echo "Usage: $(basename $0) [-a][-A][-o][-O][-k]" 2>&1
+    echo '   -a   add a small spacer to the apps part of the Dock'
+    echo '   -A   add a large spacer to the apps part of the Dock'
+    echo '   -o   add a small spacer to the others part of the Dock'
+    echo '   -O   add a large spacer to the others part of the Dock'
+    echo '   -k   perform a `killall Dock` after adding separators'
+    echo
+    echo '   the -a -A -o -O arguments can be repeated and are accumulative'
+    exit 1
+}
+
+function add_spacer {
+    defaults write com.apple.dock "persistent-${1}" -array-add "{tile-data={}; \"tile-type\"=\"${2}spacer-tile\";}"
+}
+
+if [[ ${#} -eq 0 ]]; then
+   usage
+fi
+
+run=""
+while getopts ':aAoOkh' arg
+do
+    case "${arg}" in
+        a)
+            add_spacer apps small-
+            ;;
+        A)
+            add_spacer apps
+            ;;
+        o)
+            add_spacer others small-
+            ;;
+        O)
+            add_spacer others
+            ;;
+        k)
+            run="killall Dock"
+            ;;
+        h)
+            usage
+            ;;
+        ?)
+            echo "Invalid option: -${OPTARG}."
+            echo
+            usage
+            ;;
+    esac
+done
+$run
