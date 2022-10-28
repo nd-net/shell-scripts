@@ -1,3 +1,16 @@
 #!/bin/bash
 # open a PDF generated from a man page
-man "$@" -t | open -f -a Preview;
+product_version=$(sw_vers -productVersion)
+os_vers=( ${product_version//./ } )
+os_vers_major="${os_vers[0]}"
+if [[ $os_vers_major -ge 13 ]]
+then
+	# macOS 13 removes Preview's ability to show Postscript
+	# so now ghostscript's pstopdf is necessary as well
+	tempfile=$(mktemp -t man-pdf)
+	man -t "$@" | pstopdf -o $tempfile
+	open -a Preview $tempfile
+else
+	man "$@" -t | open -f -a Preview;
+fi
+
