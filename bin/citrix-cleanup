@@ -1,0 +1,5 @@
+#!/bin/sh
+# Removing Citrix from automatically starting as in https://discussions.citrix.com/topic/400690-macos-prevent-workspacereceiver-from-starting-at-loginboot/
+rm /Library/LaunchAgents/com.citrix.ReceiverHelper.plist
+defaults write /Library/LaunchAgents/com.citrix.ServiceRecords.plist RunAtLoad 0
+defaults write /Library/LaunchAgents/com.citrix.safariadapter.plist RunAtLoad 0

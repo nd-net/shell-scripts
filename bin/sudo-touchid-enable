@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# Adds a rule to the pluggable authentication modules so that sudo
+# can be confirmed by TouchID
+
+PAM_SUDO=/etc/pam.d/sudo
+if grep pam_tid.so $PAM_SUDO > /dev/null
+then
+	echo pam_tid.so already present in $PAM_SUDO ✅
+else
+	echo Installing pam_tid.so in $PAM_SUDO 🆗
+	# Use the -V flag to see a verbose log of vim executing the script
+	sudo vi -E $PAM_SUDO <<eof
+set noro
+2 insert
+auth       sufficient     pam_tid.so
+.
+xit!
+eof
+fi
+
+cat $PAM_SUDO

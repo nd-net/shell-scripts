@@ -1,8 +1,9 @@
 # Shell-Scripts
 Small shell scripts for various purposes:
 
-* `add-dock-spacer`: Add spacers to the dock to make visually distinct groups
+* `add-dock-spacer`: add spacers to the dock to make visually distinct groups
 * `bundle-id`: show the Bundle ID of a macOS app
+* `citrix-cleanup`: fix Citrix's annoying behavior to automatically run at startup
 * `cue-convert`: convert an audio file with a structure given in a .cue file into separate files
 * `digest`: a generic digest tool (think shasum) that optionally only prints files that have the same digest (useful for checking for duplicates)
 * `extract`: extract compressed files of various formats (zip, rar, bz2, tar+...)
@@ -21,6 +22,7 @@ Small shell scripts for various purposes:
 * `qrm`: remove the quarantine flag from a file
 * `refresh-open-with`: Updates the launch services database, eliminating dead or duplicate entries in the "Open With" menu
 * `simctl`: calls `xcrun simctl` with all parameters if you cannot remember that, and shows help for undocumented commands
+* `sudo-touchid-enable`: enables the use of TouchID for sudo; this typically needs to be run after every system update
 * `tag-pdf`: Perform a fuzzy search on a given PDF file and tag it
 * `update-nib-colors`: Replace literal colors in storyboards and xib files by named colors
 * `uuniq`: prints unique lines for unsorted sources
