@@ -7,7 +7,8 @@ def parse_args():
     parser.add_argument("-D", "--device-support", action="append_const", dest="paths", const="~/Library/Developer/Xcode/iOS DeviceSupport", help="delete device support")
     parser.add_argument("-s", "--simulator-device", dest="device", action="append", help="delete simulator device")
     parser.add_argument("-S", "--simulator-unavailable", dest="device", action="append_const", const="unavailable", help="delete all unavailable simulator devices")
-    parser.add_argument("-a", "--all", action="store_const", const=["--derived-data", "--simulator-unavailable"], help="alias for %(const)s")
+    parser.add_argument("-u", "--upsell-prompt", action="store_true", help="remove Xcode's cloud upsell prompts")
+    parser.add_argument("-a", "--all", action="store_const", const=["--derived-data", "--simulator-unavailable", "--upsell-prompt"], help="alias for %(const)s")
     parser.add_argument("--dry-run", action="store_true", help="prints which directories would be cleared but don't remove any files")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.set_defaults(paths=[], device=[])
@@ -77,7 +78,22 @@ def remove_simulators(devices, verbose, dry_run):
         import subprocess
         subprocess.check_call(command)
 
+def remove_upsell_prompt(verbose, dry_run):
+    import subprocess
+    commands = [
+        ["/usr/bin/env", "defaults", "write", "com.apple.dt.Xcode", "XcodeCloudUpsellPromptEnabled", "-bool", "false"],
+    ]
+    for command in commands:
+        if verbose:
+            print("Remove upsell prompts: Executing '{}'".format(" ".join(command[1:])))
+        if not dry_run:
+            subprocess.check_call(command)
+    if verbose:
+        subprocess.check_call(["/usr/bin/env", "defaults", "read", "com.apple.dt.Xcode"])
+
 args = parse_args()
 for path in args.paths:
     remove_path(path, args.verbose, args.dry_run)
-remove_simulators(args.device, args.verbose, args.dry_run)    
+remove_simulators(args.device, args.verbose, args.dry_run)
+if args.upsell_prompt:
+    remove_upsell_prompt(args.verbose, args.dry_run)
