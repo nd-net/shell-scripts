@@ -17,6 +17,7 @@ Small shell scripts for various purposes:
 * `man-pdf`: create a PDF out of a man page and show it in Preview
 * `objc-attributesort`: sorts Objective C property attributes
 * `plist-sort`: sorts the keys of a plist file
+* `protoc-grpc`: a wrapper around `protoc` that adds the gRPC plugins to the tool
 * `pwd-finder`: prints the path of the topmost Finder window
 * `ql`: launch QuickLook on a file
 * `qrm`: remove the quarantine flag from a file

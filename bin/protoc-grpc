@@ -1,0 +1,30 @@
+#/usr/bin/env xonsh
+"""
+Adds protoc plugin aliases for all of the Google-implementation grpc plugins -
+those plugins don't honor the protoc-gen-grpc-$name convention, but rather
+use grpc_$name_plugin
+
+Now you can use `protoc-grpc --grpc-sharp_out=.` just as easily as
+`protoc --grpc-swift_out=.` with the Swift grpc implemetation.
+
+Prerequisites (homebrew recipies):
+* protoc
+* grpc
+
+If you want Swift bindings, then also add the following recipies:
+* swift-protobuf
+* grpc-swift
+"""
+plugins = {}
+prefix = "grpc_"
+postfix = "_plugin"
+for path in $PATH:
+    for plugin in pf`{path}/{prefix}.*{postfix}`:
+        plugins[plugin.name[len(prefix):-len(postfix)]] = plugin
+try:
+    plugins["objc"] = plugins["objective_c"]
+except KeyError:
+    pass
+
+protoc @(f"--plugin=protoc-gen-grpc-{name}={path}" for name, path in plugins.items()) @($ARGS[1:] if len($ARGS) > 1 else "")
+
