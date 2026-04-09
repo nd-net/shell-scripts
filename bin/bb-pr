@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""List open Bitbucket pull requests, grouped by what needs your attention.
+Requires the BitBucket Command Line Interface to be installed, e.g. via mise:
+"github:gildas/bitbucket-cli" = "latest"
+
+Usage:
+    bb-pr
+    bb-pr --user "Foo Bar"
+"""
+
+import argparse
+import json
+import subprocess
+import sys
+from dataclasses import dataclass
+
+
+@dataclass
+class PR:
+    id: int
+    title: str
+    author: str
+    source: str
+    destination: str
+    reviewers: list[str]
+    approvals: list[str]
+    updated: str
+
+    @property
+    def approved_by_str(self) -> str:
+        return ", ".join(self.approvals) if self.approvals else "none"
+
+    @property
+    def reviewers_str(self) -> str:
+        return ", ".join(self.reviewers) if self.reviewers else "none assigned"
+
+
+def bb(*args: str) -> str:
+    result = subprocess.run(
+        ["bb", *args, "--output", "json"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"bb {' '.join(args)} failed: {result.stderr.strip()}", file=sys.stderr)
+        sys.exit(1)
+    return result.stdout
+
+
+def get_current_user() -> str:
+    data = json.loads(bb("profile", "list"))
+    if not data:
+        print("No bb profile found. Pass --user explicitly.", file=sys.stderr)
+        sys.exit(1)
+    name = data[0].get("user", "")
+    # Profile stores email; we need display name from a PR participant list.
+    # Fall back to a heuristic: capitalize parts before @.
+    if "@" in name:
+        name = name.split("@")[0].replace(".", " ").title()
+    return name
+
+
+def fetch_pr_details(pr_id: int) -> PR:
+    data = json.loads(bb("pullrequest", "get", str(pr_id)))
+    approvals = [
+        p["user"]["display_name"]
+        for p in data.get("participants", [])
+        if p.get("approved")
+    ]
+    return PR(
+        id=data["id"],
+        title=data["title"],
+        author=data["author"]["display_name"],
+        source=data["source"]["branch"]["name"],
+        destination=data["destination"]["branch"]["name"],
+        reviewers=[r["display_name"] for r in data.get("reviewers", [])],
+        approvals=approvals,
+        updated=data["updated_on"][:10],
+    )
+
+
+def print_section(title: str, prs: list[PR], *, perspective: str) -> None:
+    if not prs:
+        return
+    print(f"\n\033[1m{title}\033[0m")
+    for pr in prs:
+        approved_marker = (
+            f" \033[32m[approved by: {pr.approved_by_str}]\033[0m"
+            if pr.approvals
+            else ""
+        )
+        print(f"  #{pr.id:<4} {pr.title}")
+        if perspective == "review":
+            print(f"        Author: {pr.author}  |  Updated: {pr.updated}{approved_marker}")
+        elif perspective == "own":
+            print(f"        Reviewers: {pr.reviewers_str}  |  Approvals: {pr.approved_by_str}  |  Updated: {pr.updated}")
+        else:
+            print(f"        Author: {pr.author}  |  {pr.source} -> {pr.destination}  |  Updated: {pr.updated}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="List open PRs by what needs your attention")
+    parser.add_argument("--user", help="Your display name (default: derived from bb profile)")
+    args = parser.parse_args()
+
+    user = args.user or get_current_user()
+    print(f"Checking PRs for: {user}")
+
+    pr_list = json.loads(bb("pullrequest", "list"))
+    if not pr_list:
+        print("No open pull requests.")
+        return
+
+    prs = [fetch_pr_details(pr["id"]) for pr in pr_list]
+
+    needs_my_review = [pr for pr in prs if user in pr.reviewers and user != pr.author]
+    my_prs = [pr for pr in prs if pr.author == user]
+    unassigned = [pr for pr in prs if not pr.reviewers and pr.author != user]
+    other = [
+        pr
+        for pr in prs
+        if pr not in needs_my_review and pr not in my_prs and pr not in unassigned
+    ]
+
+    print_section("Needs your review", needs_my_review, perspective="review")
+    print_section("Your PRs (waiting on reviewers)", my_prs, perspective="own")
+    print_section("No reviewers assigned", unassigned, perspective="other")
+    print_section("Other open PRs", other, perspective="other")
+
+    if not any([needs_my_review, my_prs, unassigned, other]):
+        print("\nNo open pull requests.")
+
+
+if __name__ == "__main__":
+    main()

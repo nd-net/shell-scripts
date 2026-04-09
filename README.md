@@ -2,6 +2,7 @@
 Small shell scripts for various purposes:
 
 * `add-dock-spacer`: add spacers to the dock to make visually distinct groups
+* `bb-pr`: List open Bitbucket pull requests, grouped by what needs your attention
 * `bundle-id`: show the Bundle ID of a macOS app
 * `citrix-cleanup`: fix Citrix's annoying behavior to automatically run at startup
 * `cue-convert`: convert an audio file with a structure given in a .cue file into separate files
