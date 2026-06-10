@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""List or selectively quit interactive Claude Code sessions.
+
+"Interactive" excludes headless runs (-p / --print / --max-turns), e.g. the
+remember plugin's save-session helper — those must never be signalled.
+Transcripts are journaled to disk live, so quitting here resumes cleanly with
+`claude --continue` in that directory.
+"""
+
+import argparse
+import os
+import signal
+import subprocess
+import sys
+
+
+def run(*args: str) -> str:
+    """Run a command and return its stdout (ignoring failures/exit code)."""
+    return subprocess.run(args, capture_output=True, text=True).stdout
+
+
+def interactive_pids() -> list[int]:
+    """PIDs of interactive `claude` sessions, headless invocations excluded."""
+    pids = []
+    for line in run("ps", "-axo", "pid=,command=").splitlines():
+        pid, _, command = line.strip().partition(" ")
+        argv = command.split()
+        if not argv or os.path.basename(argv[0]) != "claude":
+            continue  # not a claude process (e.g. the bash save-session helper)
+        if {"-p", "--print", "--max-turns"} & set(argv):
+            continue  # headless one-shot, not an interactive session
+        pids.append(int(pid))
+    return pids
+
+
+def cpu_map() -> dict[int, str]:
+    """Instantaneous %cpu per pid, taken from top's second sample.
+
+    top's first sample reports a lifetime average; the second reflects the
+    real interval, so we only read rows after the second 'PID' header.
+    """
+    cpus: dict[int, str] = {}
+    headers_seen = 0
+    for line in run("top", "-l", "2", "-stats", "pid,cpu", "-n", "60").splitlines():
+        if line.startswith("PID"):
+            headers_seen += 1
+        elif headers_seen == 2:
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].isdigit():
+                cpus[int(parts[0])] = parts[1]
+    return cpus
+
+
+def cwd_of(pid: int) -> str:
+    for line in run("lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn").splitlines():
+        if line.startswith("n"):
+            return line[1:]
+    return "?"
+
+
+def tty_of(pid: int) -> str:
+    return run("ps", "-o", "tty=", "-p", str(pid)).strip() or "?"
+
+
+def cmd_list(_: argparse.Namespace) -> None:
+    cpus = cpu_map()
+    print(f"{'PID':<7} {'TTY':<9} {'CPU%':<6} CWD")
+    for pid in interactive_pids():
+        print(f"{pid:<7} {tty_of(pid):<9} {cpus.get(pid, '?'):<6} {cwd_of(pid)}")
+
+
+def quit_where(matches, label: str) -> None:
+    """SIGTERM each interactive session whose cwd satisfies matches(cwd)."""
+    hit = False
+    for pid in interactive_pids():
+        cwd = cwd_of(pid)
+        if matches(cwd):
+            print(f"quitting pid={pid} cwd={cwd}")
+            os.kill(pid, signal.SIGTERM)
+            hit = True
+    if not hit:
+        raise SystemExit(f"no interactive session matched: {label}")
+
+
+def cmd_quit(args: argparse.Namespace) -> None:
+    quit_where(lambda cwd: args.match in cwd, args.match)
+
+
+def cmd_quit_others(_: argparse.Namespace) -> None:
+    here = os.getcwd()
+    quit_where(lambda cwd: cwd != here, f"others (keeping {here})")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    sub = parser.add_subparsers(title="commands")
+
+    p_list = sub.add_parser("list", help="list interactive sessions (pid, tty, cpu, cwd)")
+    p_list.set_defaults(func=cmd_list)
+
+    p_quit = sub.add_parser("quit", help="SIGTERM sessions whose cwd contains MATCH")
+    p_quit.add_argument("match", help="substring matched against each session's working directory")
+    p_quit.set_defaults(func=cmd_quit)
+
+    p_others = sub.add_parser("quit-others", help="SIGTERM every session except the one in $PWD")
+    p_others.set_defaults(func=cmd_quit_others)
+
+    parser.set_defaults(func=cmd_list)  # no subcommand → list
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

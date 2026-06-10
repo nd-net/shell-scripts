@@ -5,6 +5,7 @@ Small shell scripts for various purposes:
 * `bb-pr`: List open Bitbucket pull requests, grouped by what needs your attention
 * `bundle-id`: show the Bundle ID of a macOS app
 * `citrix-cleanup`: fix Citrix's annoying behavior to automatically run at startup
+* `claude-sessions`: list interactive Claude Code sessions, or quit selected ones by working directory (excludes headless runs; quit cleanly resumes with `claude --continue`)
 * `cue-convert`: convert an audio file with a structure given in a .cue file into separate files
 * `digest`: a generic digest tool (think shasum) that optionally only prints files that have the same digest (useful for checking for duplicates)
 * `extract`: extract compressed files of various formats (zip, rar, bz2, tar+...)
