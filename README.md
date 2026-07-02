@@ -23,6 +23,7 @@ Small shell scripts for various purposes:
 * `pwd-finder`: prints the path of the topmost Finder window
 * `ql`: launch QuickLook on a file
 * `qrm`: remove the quarantine flag from a file
+* `redact`: filter that replaces the values of `KEY=value` assignments with `<redacted>`; optionally redacts commented-out assignments too (`--include-comments`)
 * `refresh-open-with`: Updates the launch services database, eliminating dead or duplicate entries in the "Open With" menu
 * `simctl`: calls `xcrun simctl` with all parameters if you cannot remember that, and shows help for undocumented commands
 * `sudo-touchid-enable`: enables the use of TouchID for sudo; this typically needs to be run after every system update

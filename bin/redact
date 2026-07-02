@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+# Replace the values of KEY=value assignments with a placeholder
+import re
+
+def parse_args():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Redact the values of KEY=value assignments, keeping the keys and structure intact.")
+    parser.add_argument('input', nargs='?', type=argparse.FileType('rt'), default="-")
+    parser.add_argument('output', nargs='?', type=argparse.FileType('wt'), default="-")
+    parser.add_argument('-c', '--include-comments', action="store_true", help="also redact commented-out assignments, e.g. '# FOO=baz'")
+    parser.add_argument('-p', '--placeholder', default="<redacted>", help="the text to replace values with (default: %(default)s)")
+    parser.add_argument('-k', '--keys', metavar="REGEX", type=re.compile, help="only redact assignments whose key matches REGEX (default: redact all)")
+    return parser.parse_args()
+
+def redact(input, output, include_comments=False, placeholder="<redacted>", keys=None):
+    prefix = r'\s*(?:#\s*)?' if include_comments else r'\s*'
+    pattern = re.compile(r'^(' + prefix + r')([A-Za-z_][\w.-]*)(\s*=\s*)(.*)$')
+
+    def replace(match):
+        if keys and not keys.fullmatch(match.group(2)):
+            return match.group(0)
+        return match.group(1) + match.group(2) + match.group(3) + placeholder
+
+    for line in input:
+        print(pattern.sub(replace, line), end="", file=output)
+
+args = parse_args()
+redact(args.input, args.output, args.include_comments, args.placeholder, args.keys)
