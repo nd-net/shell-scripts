@@ -31,6 +31,7 @@ Small shell scripts for various purposes:
 * `tag-pdf`: Perform a fuzzy search on a given PDF file and tag it
 * `update-nib-colors`: Replace literal colors in storyboards and xib files by named colors
 * `uuniq`: prints unique lines for unsorted sources
+* `vacuum-wal`: Vacuums and optimizes a SQLite database in WAL mode
 * `xcode-cleanup`: clean up unused or unnecessary Xcode files
 * `xctdiff`: call a diff tool on the output of a XCTAssertEqual for easier comparison
 

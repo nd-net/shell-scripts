@@ -1,0 +1,17 @@
+#!/bin/sh
+sqlite3 "$1" <<EOF
+VACUUM;
+
+-- After VACUUM: DB file shrinks (if there have been deletes or updates)
+-- but the WAL contains the entire rebuilt database
+
+-- Note: VACUUM is atomic, so the WAL auto-checkpoint threshold
+-- doesn't prevent unlimited WAL growth!
+
+PRAGMA wal_checkpoint(TRUNCATE);
+
+-- After checkpoint: WAL truncated, disk space actually reclaimed
+-- Net disk savings: 40-50% (based on fragmentation level)
+
+PRAGMA optimize;
+EOF
