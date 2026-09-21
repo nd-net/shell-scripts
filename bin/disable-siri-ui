@@ -1,0 +1,27 @@
+#!/usr/bin/env xonsh
+
+"""
+Sources:
+https://mastodon.social/@never_released/117306613557500773
+https://forums.macrumors.com/threads/tired-of-seeing-ask-siri-in-every-menu-heres-how-to-disable-it.2488049/
+"""
+
+if "undo" in $ARGS:
+    defaults delete -g NSAppleMenuAllowedItems
+    sudo defaults write /Library/Preferences/FeatureFlags/Domain/WritingTools LightweightUI_macOS -dict Enabled -bool true
+else:
+    def hx(s):
+        r = 0
+        for i in s.encode():
+            r = r * 0x100 + i
+        return r
+    
+    codes = [0]
+    codes.extend(hx(i) for i in "soft apwn exit loca lock logo rlgo rcnt rrst rest rsdn shut slep spro syss".split())
+    defaults write -g NSAppleMenuAllowedItems -array @(f"-int {i}" for i in codes)    
+    sudo mkdir -p /Library/Preferences/FeatureFlags/Domain
+    sudo defaults write /Library/Preferences/FeatureFlags/Domain/WritingTools LightweightUI_macOS -dict Enabled -bool false
+
+defaults read /Library/Preferences/FeatureFlags/Domain/WritingTools LightweightUI_macOS
+defaults read -g NSAppleMenuAllowedItems
+print("Now reboot")

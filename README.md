@@ -8,6 +8,7 @@ Small shell scripts for various purposes:
 * `claude-sessions`: list interactive Claude Code sessions, or quit selected ones by working directory (excludes headless runs; quit cleanly resumes with `claude --continue`)
 * `cue-convert`: convert an audio file with a structure given in a .cue file into separate files
 * `digest`: a generic digest tool (think shasum) that optionally only prints files that have the same digest (useful for checking for duplicates)
+* `disable-siri-ui`: Disables the UI for Siri in menus and text fields on macOS 27
 * `extract`: extract compressed files of various formats (zip, rar, bz2, tar+...)
 * `find-apps`: find macOS apps using mdfind
 * `jenkins-env`: convert the (text) content of Jenkins's "Environment variables" page into commands that can be used to set the environment
